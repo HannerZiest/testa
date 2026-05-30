@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tab Focus Detector</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --on-bg-1: #0a1f14;
+    --on-bg-2: #16432b;
+    --on-accent: #34d399;
+    --on-text: #d1fae5;
+    --off-bg-1: #2a0a0a;
+    --off-bg-2: #4a1212;
+    --off-accent: #f87171;
+    --off-text: #fee2e2;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+    transition: background 0.6s ease;
+    background: radial-gradient(circle at 30% 20%, var(--on-bg-2), var(--on-bg-1) 70%);
+  }
+
+  body.away {
+    background: radial-gradient(circle at 70% 80%, var(--off-bg-2), var(--off-bg-1) 70%);
+  }
+
+  /* subtle grain */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .card {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 4rem 3rem;
+  }
+
+  .pulse {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    margin: 0 auto 2.5rem;
+    background: var(--on-accent);
+    box-shadow: 0 0 0 0 var(--on-accent);
+    animation: pulse-on 2s infinite;
+    transition: background 0.6s ease;
+  }
+
+  body.away .pulse {
+    background: var(--off-accent);
+    animation: pulse-off 1.2s infinite;
+  }
+
+  @keyframes pulse-on {
+    0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
+    70% { box-shadow: 0 0 0 22px rgba(52, 211, 153, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  }
+  @keyframes pulse-off {
+    0% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.6); }
+    70% { box-shadow: 0 0 0 22px rgba(248, 113, 113, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
+  }
+
+  .status {
+    font-size: clamp(2.8rem, 9vw, 6rem);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    color: var(--on-text);
+    transition: color 0.6s ease;
+  }
+  body.away .status { color: var(--off-text); }
+
+  .sub {
+    margin-top: 1.5rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--on-accent);
+    transition: color 0.6s ease;
+    opacity: 0.85;
+  }
+  body.away .sub { color: var(--off-accent); }
+
+  .meta {
+    margin-top: 3.5rem;
+    display: flex;
+    gap: 2.5rem;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+  }
+  .meta div { text-align: center; }
+  .meta .num {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--on-text);
+    transition: color 0.6s ease;
+  }
+  body.away .meta .num { color: var(--off-text); }
+  .meta .lbl {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    opacity: 0.55;
+    color: var(--on-text);
+    margin-top: 0.3rem;
+    transition: color 0.6s ease;
+  }
+  body.away .meta .lbl { color: var(--off-text); }
+
+  .hint {
+    margin-top: 3rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    opacity: 0.4;
+    color: var(--on-text);
+    transition: color 0.6s ease;
+  }
+  body.away .hint { color: var(--off-text); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="pulse"></div>
+    <div class="status" id="status">YOU'RE HERE</div>
+    <div class="sub" id="sub">Tab is focused</div>
+    <div class="meta">
+      <div>
+        <div class="num" id="awayCount">0</div>
+        <div class="lbl">Times away</div>
+      </div>
+      <div>
+        <div class="num" id="awayTime">0s</div>
+        <div class="lbl">Total away</div>
+      </div>
+    </div>
+    <div class="hint">Switch tabs or click another window to test</div>
+  </div>
+
+<script>
+  const body = document.body;
+  const statusEl = document.getElementById('status');
+  const subEl = document.getElementById('sub');
+  const awayCountEl = document.getElementById('awayCount');
+  const awayTimeEl = document.getElementById('awayTime');
+
+  let awayCount = 0;
+  let totalAwayMs = 0;
+  let leftAt = null;
+
+  function goAway() {
+    if (body.classList.contains('away')) return; // avoid double-firing
+    body.classList.add('away');
+    statusEl.textContent = "YOU LEFT";
+    subEl.textContent = "Tab is not focused";
+    awayCount++;
+    awayCountEl.textContent = awayCount;
+    leftAt = Date.now();
+  }
+
+  function comeBack() {
+    if (!body.classList.contains('away')) return;
+    body.classList.remove('away');
+    statusEl.textContent = "YOU'RE BACK";
+    subEl.textContent = "Tab is focused";
+    if (leftAt) {
+      totalAwayMs += Date.now() - leftAt;
+      awayTimeEl.textContent = Math.round(totalAwayMs / 1000) + "s";
+      leftAt = null;
+    }
+  }
+
+  // Primary signal: tab backgrounded / minimized / switched away
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) goAway();
+    else comeBack();
+  });
+
+  // Secondary signal: window loses focus (e.g. clicking another app/window)
+  window.addEventListener('blur', goAway);
+  window.addEventListener('focus', comeBack);
+</script>
+</body>
+</html>
